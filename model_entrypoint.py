@@ -12,24 +12,22 @@ model = FuyuForCausalLM.from_pretrained(model_name, **model_kwargs).to(device)
 
 processor = FuyuProcessor.from_pretrained(model_name)
 
-generate_kwargs = {
+gen_kwargs = {
     "stop_strings": ["\n", "<0x0A>"],
     "tokenizer": processor.tokenizer,
 }
 
-generate_kwargs = None
 ModelInfo = {
     "model_name": model_name,
     "model": model,
     "processor": processor,
-    "generate_kwargs": generate_kwargs,
+    "gen_kwargs": gen_kwargs,
 }
 
 
 if __name__ == "__main__":
     print("in main of entrypoint")
-    from troapis.app import make_app
+    import troapis.app
 
-    app = make_app(
-        model_info=ModelInfo,
-    )
+    app = troapis.make_app(model_info=ModelInfo)
+    troapis.app.run_app(app)

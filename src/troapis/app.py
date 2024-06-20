@@ -35,12 +35,12 @@ def make_app(
     return app
 
 
-def run_app():
+def run_app(model_info_from: dict | ModelInfo = None):
     import uvicorn
 
     args = utils.Args.from_args()
     app = make_app(
-        load_from="entrypoint",
+        model_info_from=model_info_from or args.load_from,
         allow_credentials=args.allow_credentials,
         allow_headers=args.allow_headers,
         allow_methods=args.allow_methods,

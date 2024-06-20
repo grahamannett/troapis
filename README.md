@@ -11,10 +11,9 @@ one is via just writing a model_entrypoint.py file that loads the model in the f
 can also run the app and pass it in (as seen in model_entrypoint `if __name__ == "__main__":` part)
 
 ```python
-from troapis import run_with_model
-
-model, processor = load_model_related()
-run_with_model(model, processor)
+from troapis.app import run_app
+model_info = load_model()
+run_app(model_info=model_info)
 ```
 
 to use dev can just do `pdm run dev`

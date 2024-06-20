@@ -20,6 +20,9 @@ from troapis.model_tools import ModelHolder, ModelInfo
 
 @dataclass
 class Args:
+    load_from: str = "entrypoint"
+
+    # server settings
     host: str = "0.0.0.0"
     port: int = 11434
     # not sure but possibly these are necessary (at least allow_credentials)
@@ -32,6 +35,7 @@ class Args:
     @classmethod
     def from_args(cls):
         parser = argparse.ArgumentParser()
+        parser.add_argument("--load-from", type=str, default=cls.load_from)
         parser.add_argument("--host", type=str, default=cls.host)
         parser.add_argument("--port", type=int, default=cls.port)
         parser.add_argument(
@@ -71,7 +75,7 @@ def _load_from_entrypoint(entrypoint: str = "model_entrypoint.py"):
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, load_from: str = "entrypoint", model_info: ModelInfo = None, **kwargs):
+async def lifespan(app: FastAPI, load_from: str = "entrypoint", **kwargs):
     # this seems like a kinda generic way that i can allow the models to be
     # loaded while the app would be easily installable/runnable from a single
     # command line entrypoint
@@ -83,9 +87,13 @@ async def lifespan(app: FastAPI, load_from: str = "entrypoint", model_info: Mode
     if isinstance(load_from, str):
         log.info(f"loading model from: {load_from}")
         model_info = load_strategies[load_from]()
+    elif isinstance(load_from, dict):
+        model_info = load_from
 
     if model_info:
         ModelHolder.add_model(**model_info)
+
+    app.state.models = ModelHolder
 
     yield
 
