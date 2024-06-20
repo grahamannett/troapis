@@ -6,6 +6,7 @@ from troapis.app import make_app
 
 from transformers import AutoModelForCausalLM, AutoTokenizer, AutoConfig
 
+# not sure if there is a smaller model?
 model_name = "gpt2"
 device = "cuda"
 model_config = AutoConfig.from_pretrained(model_name)
