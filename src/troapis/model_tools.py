@@ -1,6 +1,8 @@
 from dataclasses import dataclass, field
 from types import ModuleType
 
+from transformers import AutoTokenizer
+
 
 @dataclass
 class ModelInfo:
@@ -26,7 +28,7 @@ class ModelInfo:
     )
 
     @property
-    def device(self):
+    def device(self) -> str:
         return self.model.device
 
     def get_dec(self):
@@ -40,7 +42,7 @@ class ModelInfo:
             raise ValueError("No decode function found")
         return func, self.dec_kwargs
 
-    def get_enc(self):
+    def get_enc(self) -> tuple[callable, dict]:
         if self.enc_func:
             func = self.enc_func
         elif self.processor:
@@ -51,18 +53,14 @@ class ModelInfo:
             raise ValueError("No encode function found")
         return func, self.enc_kwargs
 
-    def get_gen(self, completion_request):
+    def get_gen(self):
         if self.gen_func:
             func = self.gen_func
         elif hasattr(self.model, "generate"):
             func = self.model.generate
         else:
             raise ValueError("No generate function found")
-        return func, {
-            **(self.gen_kwargs or {}),
-            "max_length": completion_request.max_tokens,
-            "temperature": completion_request.temperature,
-        }
+        return func, self.gen_kwargs or {}
 
     def get_chat_templater(self) -> callable:
         if self.chat_template_func:
@@ -81,6 +79,9 @@ class ModelHolder:
 
     @classmethod
     def add_model(cls, model_name: str, model: callable, **kwargs):
+        if "tokenizer" and "processor" not in kwargs:
+            kwargs["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
+
         cls.models[model_name] = ModelInfo(model_name=model_name, model=model, **kwargs)
 
     @staticmethod
@@ -103,8 +104,3 @@ class ModelHolder:
 
 
 ModelHolder = ModelHolder()
-
-
-if __name__ == "__main__":
-    mi = ModelInfo("gpt2", model=lambda x: x, enc_kwargs={"return_tensors": "pt"})
-    print(mi)

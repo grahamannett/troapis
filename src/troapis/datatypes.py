@@ -77,6 +77,7 @@ class CompletionResponse(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
+    # for messages, using the actual Message class is problematic during the request phase as needs to be used with the chat_template_func, much easier to use a dict
     messages: list[dict]
     model: str
     frequency_penalty: float = 0.0
