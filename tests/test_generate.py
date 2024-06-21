@@ -1,20 +1,17 @@
 import unittest
+import torch
 
 import transformers
-from troapis.datatypes import CompletionInput, CompletionResponse, ModelInfo
-from troapis.utils import generate_completion
+from troapis.datatypes import ChatCompletionRequest, ChatCompletionResponse
+from troapis.model_tools import ModelInfo
+from troapis.utils import generate_chat_completion
 
 
 class TestGenerateCompletion(unittest.TestCase):
     def setUp(self):
         model_name = "gpt2"
-        self.completion_input = CompletionInput(
-            model=model_name,
-            prompt=["test"],
-            max_tokens=10,
-            temperature=1.0,
-        )
-        model = transformers.AutoModelForCausalLM.from_pretrained(model_name)
+        device = "cuda:0"
+        model = transformers.AutoModelForCausalLM.from_pretrained(model_name).to(device)
         tokenizer = transformers.AutoTokenizer.from_pretrained(model_name)
 
         self.model_info = ModelInfo(
@@ -25,8 +22,13 @@ class TestGenerateCompletion(unittest.TestCase):
         self.uid = "test_uid"
 
     def test_generate_completion(self):
-        result = generate_completion(self.completion_input, self.model_info, self.uid)
-        self.assertIsInstance(result, CompletionResponse)
+        completion_input: ChatCompletionRequest = torch.load(
+            "tests/fixtures/completion_request.pt"
+        )
+        completion_input.max_tokens = 1024
+        result = generate_chat_completion(completion_input, self.model_info, self.uid)
+
+        self.assertIsInstance(result, ChatCompletionResponse)
         self.assertEqual(result.id, self.uid)
         self.assertEqual(result.model, self.model_info.model_name)
         self.assertIsInstance(result.created, int)

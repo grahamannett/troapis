@@ -20,13 +20,18 @@ class ModelInfo:
     gen_func: callable = None
     gen_kwargs: dict = None
 
+    chat_template_func: callable = None
+    chat_template_func_kwargs: dict = field(
+        default_factory={"tokenize": False, "add_generation_prompt": True}.copy,
+    )
+
     @property
     def device(self):
         return self.model.device
 
     def get_dec(self):
-        if self.decode_func:
-            func = self.decode_func
+        if self.dec_func:
+            func = self.dec_func
         elif self.processor:
             func = self.processor.decode
         elif self.tokenizer:
@@ -54,10 +59,21 @@ class ModelInfo:
         else:
             raise ValueError("No generate function found")
         return func, {
-            **self.gen_kwargs,
+            **(self.gen_kwargs or {}),
             "max_length": completion_request.max_tokens,
             "temperature": completion_request.temperature,
         }
+
+    def get_chat_templater(self) -> callable:
+        if self.chat_template_func:
+            func = self.chat_template_func
+        elif self.processor:
+            func = self.processor.tokenizer.apply_chat_template
+        elif self.tokenizer:
+            func = self.tokenizer.apply_chat_template
+        else:
+            raise ValueError("No tokenizer found")
+        return func, self.chat_template_func_kwargs
 
 
 class ModelHolder:

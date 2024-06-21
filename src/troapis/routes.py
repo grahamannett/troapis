@@ -7,7 +7,6 @@ from troapis.datatypes import (
     CompletionRequest,
     CompletionResponse,
 )
-
 from troapis.model_tools import ModelHolder
 
 router = APIRouter()
@@ -28,9 +27,8 @@ async def post_chat_completions(
     completion: ChatCompletionRequest,
 ) -> ChatCompletionResponse:
     model_info = ModelHolder[completion.model]
-
     try:
-        return utils.generate_completion(completion, model_info)
+        return await utils.generate_chat_completion(completion, model_info)
     except Exception as exception:
         raise HTTPException(status_code=500, detail=str(exception))
 
@@ -39,8 +37,4 @@ async def post_chat_completions(
 async def post_completions(
     completion: CompletionRequest,
 ) -> CompletionResponse:
-    model_info = ModelHolder[completion.model]
-    try:
-        return utils.generate_completion(completion, model_info)
-    except Exception as exception:
-        raise HTTPException(status_code=500, detail=str(exception))
+    raise HTTPException(status_code=501, detail="Not implemented")

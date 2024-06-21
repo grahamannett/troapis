@@ -1,39 +1,31 @@
-from typing import Any
-from dataclasses import dataclass, field
+from dataclasses import field
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
-# @dataclass
 class LogProbToken(BaseModel):
     token: str
     logprob: float
     bytes: list = None  # This can be `None` or a list of integers
 
 
-# @dataclass
 class LogProb(BaseModel):
     content: list[LogProbToken]
 
 
-# @dataclass
 class Message(BaseModel):
-    content: str = None
+    content: str | list[str] | list[dict]
     role: str
-    tool_calls: list[dict] = None  # List of ToolCall
-    logprobs: LogProb = None
 
 
-# @dataclass
 class Choice(BaseModel):
     index: int
     message: Message
     # log probs change for completion and chat completion
     logprobs: LogProb | dict = None
-    finish_reason: str
+    finish_reason: str = "stop"
 
 
-# @dataclass
 class Usage(BaseModel):
     completion_tokens: int
     prompt_tokens: int
@@ -42,7 +34,6 @@ class Usage(BaseModel):
 
 ## ### ###
 ## ACTUAL REQUEST AND RESPONSE DATA CLASSES
-# @dataclass
 class CompletionRequest(BaseModel):
     """
     for LEGACY endpoint.  Prefer  ChatCompletionInput
@@ -65,12 +56,13 @@ class CompletionRequest(BaseModel):
     logit_bias: None | dict = None
     user: str = ""
 
-    # def __post_init__(self):
-    #     if isinstance(self.prompt, str):
-    #         self.prompt = [self.prompt]
+    @field_validator("prompt", mode="before")
+    def prompt_to_list(cls, v: str | list[str]) -> list[str]:
+        if isinstance(v, str):
+            return [v]
+        return v
 
 
-# @dataclass
 class CompletionResponse(BaseModel):
     """
     response for /v1/completions
@@ -84,9 +76,8 @@ class CompletionResponse(BaseModel):
     usage: Usage = None
 
 
-# @dataclass
 class ChatCompletionRequest(BaseModel):
-    messages: list[dict[str, Any]]
+    messages: list[dict]
     model: str
     frequency_penalty: float = 0.0
     logit_bias: dict[int, float] = field(default_factory=dict)
@@ -109,13 +100,12 @@ class ChatCompletionRequest(BaseModel):
     user: str = None
 
 
-# @dataclass
 class ChatCompletionResponse(BaseModel):
     id: str
     choices: list[Choice]  # List of Choice
     created: int
     model: str
-    system_fingerprint: str
+    system_fingerprint: str = ""
     usage: Usage = None
     service_tier: str = None
     object: str = "chat.completion"
