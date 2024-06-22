@@ -8,7 +8,6 @@ from dataclasses import dataclass, field
 
 import torch
 from fastapi import FastAPI
-from transformers import PreTrainedTokenizer
 
 from troapis import log
 from troapis.datatypes import (
@@ -19,13 +18,11 @@ from troapis.datatypes import (
     CompletionResponse,
     Message,
 )
-from troapis.model_tools import ModelHolder, ModelInfo
+from troapis.model_tools import FuncWithArgs, ModelHolder, ModelInfo
 
+DEBUG_MODE = os.environ.get("DEBUG", "false").lower() in ["true", "1"]
 ENTRYPOINT_PATH = "model_entrypoint.py"
 MODULE_NAME = "model_entrypoint"
-DEBUG_MODE = os.environ.get("DEBUG", "false").lower() in ["true", "1"]
-
-FuncWithArgs = tuple[callable, dict]
 
 
 @dataclass
@@ -51,9 +48,7 @@ class Args:
         parser.add_argument("--load-from", type=str, default=cls.load_from)
         parser.add_argument("--host", type=str, default=cls.host)
         parser.add_argument("--port", type=int, default=cls.port)
-        parser.add_argument(
-            "--allow-credentials", type=bool, default=cls.allow_credentials
-        )
+        parser.add_argument("--allow-credentials", type=bool, default=cls.allow_credentials)
 
         parser.add_argument("--allow-headers", type=list, default=fn("allow_headers"))
         parser.add_argument("--allow-methods", type=list, default=fn("allow_methods"))
@@ -95,7 +90,11 @@ def _load_from_entrypoint(entrypoint: str = None) -> ModelInfo | dict:
 
 
 @asynccontextmanager
-async def lifespan(app: FastAPI, load_from: str = "entrypoint", **kwargs):
+async def lifespan(
+    app: FastAPI,
+    load_from: str | dict | ModelInfo = "entrypoint",
+    **kwargs,
+):
     # this seems like a kinda generic way that i can allow the models to be
     # loaded while the app would be easily installable/runnable from a single
     # command line entrypoint
@@ -149,7 +148,7 @@ async def generate_chat_completion(
     inputs = []
 
     device = model_info.device
-    chat_temp_func, chat_temp_func_kwargs = model_info.get_chat_templater()
+    chat_func, chat_func_kwargs = model_info.get_chat()
     enc_func, enc_kwargs = model_info.get_enc()
     dec_func, dec_kwargs = model_info.get_dec()
     gen_func, gen_kwargs = model_info.get_gen()
@@ -158,7 +157,7 @@ async def generate_chat_completion(
 
     # need to format the messages as they will not come in as just strings
     _chat_completion_check(request, uid, save=DEBUG_MODE)
-    prompt = chat_temp_func(request.messages, **chat_temp_func_kwargs)
+    prompt = chat_func(request.messages, **chat_func_kwargs)
     # some templates have [INST] which will be problematic for rich
     log.debug("generate for prompt below\n---⤵️---\n"), log.debug(prompt, markup=False)
 
@@ -212,9 +211,7 @@ async def generate_chat_completion(
     )
 
 
-async def generate_completion(
-    request: CompletionRequest, model_info: ModelInfo, uid: str = ""
-) -> CompletionResponse:
+async def generate_completion(request: CompletionRequest, model_info: ModelInfo, uid: str = "") -> CompletionResponse:
     # not going to implement unless i see where this is needed in a benchmark. ideally would just be one function for
     # this and generate_chat_completion but they have different formats and return types
     raise NotImplementedError("generate_completion not implemented")
@@ -229,7 +226,8 @@ def _generate(
     echo: bool = False,
     num_gen: int = 1,
 ):
-    # should be similar to tokenizer(prompt, return_tensors="pt")
+    # should migrate to using generic generate between all generates if
+    #  implementing the generate_completion
     enc_func, enc_kwargs = enc
     dec_func, dec_kwargs = dec
     gen_func, gen_kwargs = gen

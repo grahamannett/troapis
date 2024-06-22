@@ -1,4 +1,4 @@
-# EXAMPLE FILE
+# EXAMPLE FILE, can be used either directly or via `fastapi dev src/troapis/app.py`
 import os
 
 import torch
@@ -11,9 +11,7 @@ model_kwargs = {"torch_dtype": torch.float16}
 
 model = FuyuForCausalLM.from_pretrained(model_name, **model_kwargs).to(device)
 processor = FuyuProcessor.from_pretrained(model_name)
-gen_kwargs = {
-    # "stop_strings": ["\n", "<0x0A>"],
-    # "tokenizer": processor.tokenizer,
+generate_kwargs = {  # to use stop strings do: "stop_strings": ["\n", "<0x0A>"], "tokenizer": processor.tokenizer,
 }
 
 
@@ -21,7 +19,7 @@ model_info = ModelInfo = {
     "model_name": model_name,
     "model": model,
     "processor": processor,
-    "gen_kwargs": gen_kwargs,
+    "generate_kwargs": generate_kwargs,
 }
 
 

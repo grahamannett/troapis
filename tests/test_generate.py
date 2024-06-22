@@ -2,12 +2,12 @@ import unittest
 import torch
 
 import transformers
-from troapis.datatypes import ChatCompletionRequest, ChatCompletionResponse
+from troapis.datatypes import ChatCompletionRequest, ChatCompletionResponse, Usage
 from troapis.model_tools import ModelInfo
 from troapis.utils import generate_chat_completion
 
 
-class TestGenerateCompletion(unittest.TestCase):
+class TestGenerateCompletion(unittest.IsolatedAsyncioTestCase):
     def setUp(self):
         model_name = "gpt2"
         device = "cuda:0"
@@ -21,16 +21,14 @@ class TestGenerateCompletion(unittest.TestCase):
         )
         self.uid = "test_uid"
 
-    def test_generate_completion(self):
-        completion_input: ChatCompletionRequest = torch.load(
-            "tests/fixtures/completion_request.pt"
-        )
+    async def test_generate_completion(self):
+        completion_input: ChatCompletionRequest = torch.load("tests/fixtures/completion_request.pt")
         completion_input.max_tokens = 1024
-        result = generate_chat_completion(completion_input, self.model_info, self.uid)
+        result = await generate_chat_completion(completion_input, self.model_info, self.uid)
 
         self.assertIsInstance(result, ChatCompletionResponse)
         self.assertEqual(result.id, self.uid)
         self.assertEqual(result.model, self.model_info.model_name)
         self.assertIsInstance(result.created, int)
         self.assertIsInstance(result.choices, list)
-        self.assertIsInstance(result.usage, dict)
+        self.assertIsInstance(result.usage, Usage)

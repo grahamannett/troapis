@@ -26,14 +26,14 @@ The `model_info` object/dict needs the following to work:
 - `processor` or `tokenizer` - the processor/tokenizer object, if not provided will use the default one from the `model_name`
 
 ### optional fields:
-- `dec_func` - the decoding function, if not provided will try to use `processor.decode` or `tokenizer.decode`
-- `dec_kwargs` - the decoding function kwargs, if not provided will be `"skip_special_tokens": True`
-- `enc_func` - the encoding function, if not provided will try to use `processor.__call__` or `tokenizer.__call__`
-- `enc_kwargs` - the encoding function kwargs, if not provided will be `{"return_tensors": "pt"}`
-- `gen_func` - the generation function, if not provided will try to use `model.generate`
-- `gen_kwargs` - the generation function kwargs, if not provided will be empty
-- `chat_template_func` - the chat template function, if not provided will use `processor.tokenizer.apply_chat_template` or `tokenizer.apply_chat_template`.  this is actually really important for generations for AgentBench to even work and likely the default template for the model that does not have this will result in the model failing almost all tasks
-- `chat_template_func_kwargs` - the chat template function kwargs, if not provided will be `{"tokenize": False, "add_generation_prompt": True}`
+- `decode` - the decoding function, if not provided will try to use `processor.decode` or `tokenizer.decode`
+- `decode_kwargs` - the decoding function kwargs, if not provided will be `"skip_special_tokens": True`
+- `encode` - the encoding function, if not provided will try to use `processor.__call__` or `tokenizer.__call__`
+- `encode_kwargs` - the encoding function kwargs, if not provided will be `{"return_tensors": "pt"}`
+- `generate` - the generation function, if not provided will try to use `model.generate`
+- `generate_kwargs` - the generation function kwargs, if not provided will be empty
+- `apply_chat_template` - the chat template function, if not provided will use `processor.tokenizer.apply_chat_template` or `tokenizer.apply_chat_template`.  this is actually really important for generations for AgentBench to even work and likely the default template for the model that does not have this will result in the model failing almost all tasks
+- `apply_chat_template_kwargs` - the chat template function kwargs, if not provided will be `{"tokenize": False, "add_generation_prompt": True}`
 
 
 # Similar projects or alternatives (and why they didnt work for my usage)

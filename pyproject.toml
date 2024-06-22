@@ -20,3 +20,6 @@
 
     [tool.pdm.scripts]
         dev = "fastapi dev src/troapis/dev.py"
+
+[tool.ruff]
+    line-length = 120

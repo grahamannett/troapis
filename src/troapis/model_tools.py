@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
-from types import ModuleType
 
 from transformers import AutoTokenizer
+
+FuncWithArgs = tuple[callable, dict]
 
 
 @dataclass
@@ -13,17 +14,17 @@ class ModelInfo:
     processor: callable = None
     tokenizer: callable = None
 
-    dec_func: callable = None
-    dec_kwargs: dict = field(default_factory={"skip_special_tokens": True}.copy)
+    decode: callable = None
+    decode_kwargs: dict = field(default_factory={"skip_special_tokens": True}.copy)
 
-    enc_func: callable = None
-    enc_kwargs: dict = field(default_factory={"return_tensors": "pt"}.copy)
+    encode: callable = None
+    encode_kwargs: dict = field(default_factory={"return_tensors": "pt"}.copy)
 
-    gen_func: callable = None
-    gen_kwargs: dict = None
+    generate: callable = None
+    generate_kwargs: dict = None
 
-    chat_template_func: callable = None
-    chat_template_func_kwargs: dict = field(
+    apply_chat_template: callable = None
+    apply_chat_template_kwargs: dict = field(
         default_factory={"tokenize": False, "add_generation_prompt": True}.copy,
     )
 
@@ -31,51 +32,41 @@ class ModelInfo:
     def device(self) -> str:
         return self.model.device
 
-    def get_dec(self):
-        if self.dec_func:
-            func = self.dec_func
-        elif self.processor:
-            func = self.processor.decode
-        elif self.tokenizer:
-            func = self.tokenizer.decode
-        else:
-            raise ValueError("No decode function found")
-        return func, self.dec_kwargs
+    def _get_func_from(
+        self,
+        name: str,
+        subname: str = None,
+        accs: list[str] = None,
+    ):
+        subname = subname or name  # if subname is None, then it is the same as name
+        accs = accs or [self.processor, self.tokenizer]  # if accs is None, then it is the default, nicer than
 
-    def get_enc(self) -> tuple[callable, dict]:
-        if self.enc_func:
-            func = self.enc_func
-        elif self.processor:
-            func = self.processor
-        elif self.tokenizer:
-            func = self.tokenizer
-        else:
-            raise ValueError("No encode function found")
-        return func, self.enc_kwargs
+        def _notnone(a):
+            return a is not None
 
-    def get_gen(self):
-        if self.gen_func:
-            func = self.gen_func
-        elif hasattr(self.model, "generate"):
-            func = self.model.generate
-        else:
-            raise ValueError("No generate function found")
-        return func, self.gen_kwargs or {}
+        if (func := getattr(self, name, None)) is not None:
+            return func
 
-    def get_chat_templater(self) -> callable:
-        if self.chat_template_func:
-            func = self.chat_template_func
-        elif self.processor:
-            func = self.processor.tokenizer.apply_chat_template
-        elif self.tokenizer:
-            func = self.tokenizer.apply_chat_template
-        else:
-            raise ValueError("No tokenizer found")
-        return func, self.chat_template_func_kwargs
+        for acc in filter(_notnone, accs):
+            return getattr(acc, subname)
+
+        raise ValueError(f"No {name} found")
+
+    def get_dec(self) -> FuncWithArgs:
+        return self._get_func_from("decode"), self.decode_kwargs
+
+    def get_enc(self) -> FuncWithArgs:
+        return self._get_func_from("encode", "__call__"), self.encode_kwargs
+
+    def get_gen(self) -> FuncWithArgs:
+        return self._get_func_from("generate", accs=[self.model]), self.generate_kwargs or {}
+
+    def get_chat(self) -> FuncWithArgs:
+        return self._get_func_from("apply_chat_template"), self.apply_chat_template_kwargs
 
 
 class ModelHolder:
-    models: dict[str, ModelInfo] = {}  # {field(default_factory=dict)}
+    models: dict[str, ModelInfo] = {}
 
     @classmethod
     def add_model(cls, model_name: str, model: callable, **kwargs):
@@ -83,15 +74,6 @@ class ModelHolder:
             kwargs["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
 
         cls.models[model_name] = ModelInfo(model_name=model_name, model=model, **kwargs)
-
-    @staticmethod
-    def marshall_from_file(mod: ModuleType) -> ModelInfo:
-        model_info = ModelInfo(
-            model_name=mod.model_name,
-            model=mod.model,
-            processor=mod.processor,
-        )
-        return model_info
 
     def __getitem__(self, model_name: str | int) -> ModelInfo:
         if isinstance(model_name, int):
