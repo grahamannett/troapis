@@ -1,8 +1,20 @@
+from __future__ import annotations
+
+import importlib
+import os.path
+import sys
 from dataclasses import dataclass, field
 
 from transformers import AutoTokenizer
 
+from troapis.constants import MODULE_NAME
+from troapis import log
+
 FuncWithArgs = tuple[callable, dict]
+
+
+def _notnone(a):
+    return a is not None
 
 
 @dataclass
@@ -25,8 +37,29 @@ class ModelInfo:
 
     apply_chat_template: callable = None
     apply_chat_template_kwargs: dict = field(
-        default_factory={"tokenize": False, "add_generation_prompt": True}.copy,
+        default_factory={"tokenize": False, "add_generation_prompt": False}.copy,
     )
+
+    def __post_init__(self):
+        self.accs = [v for v in (self.processor, self.tokenizer) if _notnone(v)]
+
+    @classmethod
+    def from_filepath(cls, entrypoint: str) -> ModelInfo:
+        if os.path.isfile(entrypoint):
+            spec = importlib.util.spec_from_file_location(MODULE_NAME, entrypoint)
+            model_entrypoint = importlib.util.module_from_spec(spec)
+            sys.modules[MODULE_NAME] = model_entrypoint
+            spec.loader.exec_module(model_entrypoint)
+            model_info = model_entrypoint.model_info
+        else:
+            raise ModuleNotFoundError("didnt find model_hentrypoint.py")
+
+        # allow for model_info to either be ModelInfo dataclass or dict
+        if isinstance(model_info, dict):
+            model_info = cls(**model_info)
+
+        log.info(f"loaded: `{model_info.model_name}` from `{entrypoint}`")
+        return model_info
 
     @property
     def device(self) -> str:
@@ -37,12 +70,14 @@ class ModelInfo:
         name: str,
         subname: str = None,
         accs: list[str] = None,
+        direct: tuple[object, str] = None,
     ):
         subname = subname or name  # if subname is None, then it is the same as name
-        accs = accs or [self.processor, self.tokenizer]  # if accs is None, then it is the default, nicer than
+        accs = accs or self.accs  # if accs is None, then try default accs
 
-        def _notnone(a):
-            return a is not None
+        if direct and (obj := getattr(*direct, None)) is not None:
+            if (func := getattr(obj, name, None)) is not None:
+                return func
 
         if (func := getattr(self, name, None)) is not None:
             return func
@@ -62,18 +97,28 @@ class ModelInfo:
         return self._get_func_from("generate", accs=[self.model]), self.generate_kwargs or {}
 
     def get_chat(self) -> FuncWithArgs:
-        return self._get_func_from("apply_chat_template"), self.apply_chat_template_kwargs
+        # the apply_chat_template is on the tokenizer in general despite the processor having the method as well
+        direct = (self.processor, "tokenizer")
+        return self._get_func_from("apply_chat_template", direct=direct), self.apply_chat_template_kwargs
 
 
 class ModelHolder:
     models: dict[str, ModelInfo] = {}
 
     @classmethod
-    def add_model(cls, model_name: str, model: callable, **kwargs):
-        if "tokenizer" and "processor" not in kwargs:
-            kwargs["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
+    def add_model(
+        cls,
+        model_info: dict | ModelInfo,
+        **kwargs,
+    ):
+        if isinstance(model_info, dict):
+            model_name = model_info["model_name"]
+            if "tokenizer" and "processor" not in kwargs:
+                kwargs["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
 
-        cls.models[model_name] = ModelInfo(model_name=model_name, model=model, **kwargs)
+            model_info = ModelInfo(**model_info, **kwargs)
+
+        cls.models[model_info.model_name] = model_info
 
     def __getitem__(self, model_name: str | int) -> ModelInfo:
         if isinstance(model_name, int):

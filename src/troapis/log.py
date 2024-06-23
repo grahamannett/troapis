@@ -1,3 +1,4 @@
+import os
 import atexit
 import functools
 from enum import StrEnum, auto
@@ -5,6 +6,7 @@ from enum import StrEnum, auto
 from rich.console import Console
 from rich.progress import MofNCompleteColumn, Progress, TimeElapsedColumn
 from rich.prompt import Prompt
+from rich.markup import escape
 
 
 # Log levels
@@ -30,11 +32,11 @@ class LogLevel(StrEnum):
         return levels.index(self) <= levels.index(other)
 
 
+# Set the current log level, allow for environment variable override.
+LEVEL = LogLevel(os.environ.get("LOGLEVEL", LogLevel.INFO))
+
 # Console for pretty printing.
 _console = Console()
-
-# The current log level.
-LEVEL = LogLevel.INFO
 
 
 def get_console():
@@ -128,9 +130,7 @@ def warn(msg: str, _stack_offset: int = 3, **kwargs):
         kwargs: Keyword arguments to pass to the print function.
     """
     if LEVEL <= LogLevel.WARNING:
-        print(
-            f"[orange1]Warning: {msg}[/orange1]", _stack_offset=_stack_offset, **kwargs
-        )
+        print(f"[orange1]Warning: {msg}[/orange1]", _stack_offset=_stack_offset, **kwargs)
 
 
 @functools.cache
@@ -182,9 +182,7 @@ def error(msg: str, _stack_offset: int = 3, **kwargs):
         print(f"[red]{msg}[/red]", _stack_offset=_stack_offset, **kwargs)
 
 
-def check_or_fail(
-    condition: bool, msg: str = "Check failed", _stack_offset: int = 3, **kwargs
-):
+def check_or_fail(condition: bool, msg: str = "Check failed", _stack_offset: int = 3, **kwargs):
     """Check a condition and print an error message if it is False.
 
     Args:
@@ -226,9 +224,7 @@ def _ensure_progress_exit(progress: Progress) -> None:
         try:
             progress.stop()
         except Exception as err:
-            warn(
-                f"Error ensuring progress exits cleanly. Shell cursor may not display. Error: {err}"
-            )
+            warn(f"Error ensuring progress exits cleanly. Shell cursor may not display. Error: {err}")
 
     return _fn
 
@@ -280,3 +276,24 @@ def status(*args, **kwargs):
         A new status.
     """
     return _console.status(*args, **kwargs)
+
+
+def with_escape(log_func=info, log_str: str = None, **kwargs):
+    """
+    Executes the given log function with the provided arguments.
+    If no log function is provided, it defaults to the `info` function.
+
+    Args:
+        log_func (callable, optional): The log function to execute. Defaults to info.
+
+    Raises:
+        TypeError: If the provided log function is not callable.
+
+    Example:
+        with_escape(debug, "Debug message")  # Calls the debug function with the message
+        with_escape("Error occurred", exc_info=True)  # Calls the info function with the message and exception info
+    """
+    if not callable(log_func):
+        raise TypeError("log_func must be callable")
+
+    log_func(escape(log_str), **kwargs)

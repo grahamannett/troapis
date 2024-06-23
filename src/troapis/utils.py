@@ -1,5 +1,4 @@
 import argparse
-import importlib
 import os
 import sys
 import time
@@ -10,6 +9,7 @@ import torch
 from fastapi import FastAPI
 
 from troapis import log
+from troapis.constants import DEBUG_MODE
 from troapis.datatypes import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -19,10 +19,6 @@ from troapis.datatypes import (
     Message,
 )
 from troapis.model_tools import FuncWithArgs, ModelHolder, ModelInfo
-
-DEBUG_MODE = os.environ.get("DEBUG", "false").lower() in ["true", "1"]
-ENTRYPOINT_PATH = "model_entrypoint.py"
-MODULE_NAME = "model_entrypoint"
 
 
 @dataclass
@@ -66,29 +62,6 @@ def allow_import_from_dir(model_dir: str = None):
     sys.path.append(model_dir)
 
 
-def _load_from_entrypoint(entrypoint: str = None) -> ModelInfo | dict:
-    if not entrypoint:
-        entrypoint = os.environ.get("ENTRYPOINT", ENTRYPOINT_PATH)
-
-    if os.path.isfile(entrypoint):
-        # seems more robust than:
-        #   allow_import_from_dir(); importlib.import_module(file.replace(".py", ""))
-        spec = importlib.util.spec_from_file_location(MODULE_NAME, entrypoint)
-        model_entrypoint = importlib.util.module_from_spec(spec)
-        sys.modules[MODULE_NAME] = model_entrypoint
-        spec.loader.exec_module(model_entrypoint)
-
-        model_info = model_entrypoint.model_info
-        # allow for model_info to either be ModelInfo dataclass or dict
-        model_name = model_info.get("model_name", getattr(model_info, "model_name"))
-
-        log.info(f"loaded: `{model_name}` from `{entrypoint}`")
-    else:
-        raise ModuleNotFoundError("didnt find model_hentrypoint.py")
-
-    return model_info
-
-
 @asynccontextmanager
 async def lifespan(
     app: FastAPI,
@@ -99,9 +72,12 @@ async def lifespan(
     # loaded while the app would be easily installable/runnable from a single
     # command line entrypoint
     load_strategies = {
-        "entrypoint": _load_from_entrypoint,
+        "entrypoint": ModelInfo.from_filepath,
         "args": lambda: kwargs["model_info"],
     }
+
+    if env_entrypoint := os.environ.get("ENTRYPOINT"):
+        kwargs["entrypoint"] = env_entrypoint
 
     if isinstance(load_from, str):
         log.info(f"loading model from: {load_from}")
@@ -109,8 +85,7 @@ async def lifespan(
     elif isinstance(load_from, dict):
         model_info = load_from
 
-    if model_info:
-        ModelHolder.add_model(**model_info)
+    ModelHolder.add_model(model_info, **kwargs)
 
     app.state.models = ModelHolder
 
@@ -159,7 +134,7 @@ async def generate_chat_completion(
     _chat_completion_check(request, uid, save=DEBUG_MODE)
     prompt = chat_func(request.messages, **chat_func_kwargs)
     # some templates have [INST] which will be problematic for rich
-    log.debug("generate for prompt below\n---⤵️---\n"), log.debug(prompt, markup=False)
+    log.with_escape(log.debug, f"generate for prompt below\n---⤵️---\n{prompt}")
 
     # should be similar to tokenizer(prompt, return_tensors="pt")
     input = enc_func(prompt, **enc_kwargs)
