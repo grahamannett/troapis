@@ -25,3 +25,10 @@ model_info = ModelInfo = {
     "processor": processor,
     "encode": processor.tokenizer.__call__,  # not using images
 }
+
+
+if __name__ == "__main__":
+    import troapis
+
+    troapis.log.rule(title="running for agent-bench")
+    troapis.app.run_app(model_info_from=model_info)

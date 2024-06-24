@@ -1,7 +1,6 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from troapis import log
-from troapis import utils
+from troapis import log, utils
 from troapis.datatypes import (
     ChatCompletionRequest,
     ChatCompletionResponse,
@@ -26,10 +25,13 @@ async def get_models():
 @router.post("/chat/completions")
 async def post_chat_completions(
     completion: ChatCompletionRequest,
+    request: Request,
 ) -> ChatCompletionResponse:
+    request_uid = request.app.state.request_state.uid
+
     model_info = ModelHolder[completion.model]
     try:
-        response = await utils.generate_chat_completion(completion, model_info)
+        response = await utils.generate_chat_completion(completion, model_info, uid=request_uid)
         log.info(f"got response: {response}")
         return response
     except Exception as exception:

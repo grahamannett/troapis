@@ -43,7 +43,8 @@ class TestEntrypointChatCompletion(unittest.IsolatedAsyncioTestCase):
         model_info = ModelInfo.from_filepath("model_entrypoint.py")
 
         completion_input: ChatCompletionRequest = torch.load(completion_request_fixture)
-        completion_input.max_tokens = 1024
+        completion_input.max_tokens = 128
+        completion_input.temperature = 0.5
         result = await generate_chat_completion(completion_input, model_info, uid)
         self.assertIsInstance(result, ChatCompletionResponse)
 

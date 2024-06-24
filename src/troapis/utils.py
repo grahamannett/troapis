@@ -97,14 +97,13 @@ def _chat_completion_check(
     uid: str | int,
     save: bool = DEBUG_MODE,
 ) -> None:
+    if save:
+        save_file = f"completion{uid}-{int(time.time())}.pt"
+        log.info(f"Saving request to out/{save_file}")
+        torch.save(request, f"out/{save_file}")
+
     if not isinstance(request.messages[0], dict):
         log.error(f"Not clear what the messages are: {request.messages}")
-
-        if save:
-            save_file = f"completion{uid}-{int(time.time())}.pt"
-            log.debug(f"Saving request to out/{save_file}")
-            torch.save(request, f"out/{save_file}")
-
         raise TypeError("messages should be a list of dictionaries")
 
 
@@ -154,8 +153,8 @@ async def generate_chat_completion(
     inputs.append(input)
 
     # generate completions
-    log.rule(title="Generating from Prompt⤵️")
-    log.with_escape(log.debug, prompt)
+    log.rule(title=f"Generating from Prompt⤵️|UID:{uid}|TEMP:{request.temperature}")
+    log.with_escape(log.info, prompt)
 
     prompt_tokens, completion_tokens = 0, 0
     for i, input in enumerate(inputs):

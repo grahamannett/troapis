@@ -8,6 +8,15 @@ from troapis.model_tools import ModelInfo
 from troapis.routes import router
 
 
+class RequestState:
+    request_uid: int = 0
+
+    @property
+    def uid(self):
+        self.request_uid += 1
+        return str(self.request_uid)
+
+
 def make_app(
     model_info_from: str | dict | ModelInfo = "entrypoint",
     add_midleware: bool = True,
@@ -32,6 +41,8 @@ def make_app(
         )
 
     app.include_router(router, prefix="/v1")
+    app.state.request_state = RequestState()
+
     return app
 
 
