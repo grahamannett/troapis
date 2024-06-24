@@ -163,6 +163,7 @@ async def generate_chat_completion(
 
         for ii in range(request.n):
             # should be similar to model.generate(input, **gen_kwargs)
+
             output = gen_func(**input, **gen_kwargs)
             output = output.squeeze(0)
 
