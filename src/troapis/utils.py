@@ -112,12 +112,23 @@ async def generate_chat_completion(
     request: ChatCompletionRequest,
     model_info: ModelInfo,
     uid: str = "",
+    end_of_text: list | tuple = (),
+    done_callback: callable = None,
+    # override specific flags/kwargs
+    override_echo: bool = None,
 ):
-    """this is here as makes it easier for testing purposes
+    """Generates chat completions based on the given request and model information.
 
     Args:
-        request (ChatCompletionRequest): _description_
-        model_info (ModelInfo): _description_
+        request (ChatCompletionRequest): The request object containing the chat completion parameters.
+        model_info (ModelInfo): The model information object containing the necessary functions and arguments.
+        uid (str, optional): The unique identifier for the chat completion. Defaults to "".
+        echo_override (bool, optional): Overrides the echo setting in the request. Defaults to None.
+        done_callback (callable, optional): The callback function to be called when the chat completion is done. Defaults to None.  Useful for logging additional/saving the request/response
+
+    Returns:
+        ChatCompletionResponse: The response object containing the generated chat completions.
+
     """
     choices = []
     inputs = []
@@ -128,20 +139,24 @@ async def generate_chat_completion(
     dec_func, dec_kwargs = model_info.get_dec()
     gen_func, gen_kwargs = model_info.get_gen()
 
-    gen_kwargs |= {"max_length": request.max_tokens, "temperature": request.temperature}
+    gen_kwargs |= {"max_new_tokens": request.max_tokens, "temperature": request.temperature}
+
+    # echo not on ChatCompletionRequest, not sure if there is equivalent in ChatCompletionRequest but allow override
+    # for calling `generate_chat_completion` independently
+    echo_input = getattr(request, "echo", False) if (override_echo is None) else override_echo
 
     # need to format the messages as they will not come in as just strings
     _chat_completion_check(request, uid, save=DEBUG_MODE)
     prompt = chat_func(request.messages, **chat_func_kwargs)
     # some templates have [INST] which will be problematic for rich
-    log.with_escape(log.debug, f"generate for prompt below\n---⤵️---\n{prompt}")
-
     # should be similar to tokenizer(prompt, return_tensors="pt")
     input = enc_func(prompt, **enc_kwargs)
     inputs.append(input)
 
     # generate completions
-    log.debug(f"generating completions for {len(inputs)} prompts")
+    log.rule(title="Generating from Prompt⤵️")
+    log.with_escape(log.debug, prompt)
+
     prompt_tokens, completion_tokens = 0, 0
     for i, input in enumerate(inputs):
         input = input.to(device)
@@ -151,9 +166,12 @@ async def generate_chat_completion(
             output = gen_func(**input, **gen_kwargs)
             output = output.squeeze(0)
 
-            # echo not on ChatCompletionRequest, not sure if there is equivalent
-            if not getattr(request, "echo", False):
+            if not echo_input:
                 output = output[input.input_ids.shape[1] :]
+
+            for item in end_of_text:
+                if item in output:
+                    output = output.split(item)[0]
 
             # should be similar to tokenizer.decode(output, **dec_kwargs)
             text = dec_func(output, **dec_kwargs)
@@ -177,13 +195,18 @@ async def generate_chat_completion(
         "total_tokens": prompt_tokens + completion_tokens,
     }
 
-    return ChatCompletionResponse(
+    response = ChatCompletionResponse(
         id=uid,
         model=model_info.model_name,
         created=int(time.time()),
         choices=choices,
         usage=usage_info,
     )
+
+    if done_callback:
+        done_callback(**locals())
+
+    return response
 
 
 async def generate_completion(request: CompletionRequest, model_info: ModelInfo, uid: str = "") -> CompletionResponse:

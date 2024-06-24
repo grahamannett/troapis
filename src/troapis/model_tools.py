@@ -17,6 +17,13 @@ def _notnone(a):
     return a is not None
 
 
+# available here as these are the likely the values you want to use unless model specific, in which case you can import these and then modify per model
+_decode_kwargs = dict(skip_special_tokens=True)
+_encode_kwargs = dict(add_special_tokens=False, return_tensors="pt")
+_generate_kwargs = dict(do_sample=True)
+_apply_chat_template_kwargs = dict(tokenize=False, add_generation_prompt=True)
+
+
 @dataclass
 class ModelInfo:
     model_name: str
@@ -27,21 +34,25 @@ class ModelInfo:
     tokenizer: callable = None
 
     decode: callable = None
-    decode_kwargs: dict = field(default_factory={"skip_special_tokens": True}.copy)
+    decode_kwargs: dict = field(default_factory=_decode_kwargs.copy)
 
     encode: callable = None
-    encode_kwargs: dict = field(default_factory={"return_tensors": "pt"}.copy)
+    encode_kwargs: dict = field(default_factory=_encode_kwargs.copy)
 
     generate: callable = None
-    generate_kwargs: dict = None
+    generate_kwargs: dict = field(default_factory=_generate_kwargs.copy)
 
     apply_chat_template: callable = None
-    apply_chat_template_kwargs: dict = field(
-        default_factory={"tokenize": False, "add_generation_prompt": False}.copy,
-    )
+    apply_chat_template_kwargs: dict = field(default_factory=_apply_chat_template_kwargs.copy)
+
+    end_of_text: list[str] | tuple[str] = None
 
     def __post_init__(self):
         self.accs = [v for v in (self.processor, self.tokenizer) if _notnone(v)]
+
+        # if the processor is used, makes tokenizer easier to access
+        if tokenizer := getattr(self.processor, "tokenizer", None):
+            self.tokenizer = tokenizer
 
     @classmethod
     def from_filepath(cls, entrypoint: str) -> ModelInfo:
