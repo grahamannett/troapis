@@ -2,6 +2,10 @@
 
 I am not sure why there isnt something like this already, basically a bare bones way to serve dev model using openai api endpoints/schema. Not intended to be performant or scalable but specifically for getting results from benchmarks like AgentBench with minimal effort but easily adaptable per model as the models I am interested in generally do not have a chat template or encoding without images can cause issues.
 
+# Install
+
+Most simple way is git clone repo and then `pdm install`/`sync` otherwise `pip install git+https://github.com/grahamannett/troapis` should work.
+
 # Usage
 
 few ways to use (as I am not clear how I want to be using it yet):
@@ -65,7 +69,7 @@ user    0m0.004s
 sys     0m0.009s
 ```
 
-# Later todo
+# Future
 - [ ] allow serving multiple instances of model for concurrent requests
-  - not clear how best to do this, easiest seems to be using https://docs.ray.io/en/latest/serve/model-multiplexing.html
+  - likely need to use something similar to https://docs.ray.io/en/latest/serve/model-multiplexing.html
   - alternative is just use `multiprocessing.Queue` so that can load 1 model on each gpu and serve from available queue.  have a feeling this will be more complicated than expected

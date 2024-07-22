@@ -9,7 +9,7 @@ from troapis.datatypes import (
     CompletionRequest,
     CompletionResponse,
 )
-from troapis.model_tools import ModelHolder
+from troapis.model_tools import ModelHolder, ModelInfo
 from troapis.constants import REQ_SAVE_DIR, SAVE_MODE
 import json
 
@@ -50,10 +50,10 @@ async def post_chat_completions(
     request_filepath: str = "Not-Saved",
 ) -> ChatCompletionResponse:
     uid = request.app.state.request_state.uid
-    model_info = ModelHolder[completion.model]
+    model_info: ModelInfo = ModelHolder[completion.model]
 
     if SAVE_MODE:
-        request_filepath = await _save_request(request, model_info.name, uid)
+        request_filepath = await _save_request(request, model_info.model_name, uid)
 
     try:
         response = await utils.generate_chat_completion(completion, model_info, uid=uid)

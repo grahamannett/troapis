@@ -1,9 +1,7 @@
 from transformers import AutoTokenizer, AutoModelForCausalLM
 import torch
 
-from troapis.constants import device
-
-# device = "auto"  # device
+device = "auto"  # device
 
 model_name = "google/gemma-2-9b"
 tokenizer = AutoTokenizer.from_pretrained(model_name)

@@ -7,12 +7,9 @@ from transformers import FuyuForCausalLM, FuyuProcessor
 device = os.environ.get("DEVICE", "cuda:0")
 
 model_name = "adept/fuyu-8b"
-# model_kwargs = {}
 model_kwargs = {"torch_dtype": torch.float16, "device_map": "auto"}
 
-# can also load from config if necessary for custom/quicker testing
-# model_config = FuyuConfig.from_pretrained(model_name)
-# model = AutoModelForCausalLM.from_config(model_config, **model_kwargs).to(device)
+# can also load from config if necessary for custom/quicker testing, e.g. FuyuConfig.from_pretrained(), etc.
 model = FuyuForCausalLM.from_pretrained(model_name, **model_kwargs).to(device)
 processor = FuyuProcessor.from_pretrained(model_name)
 

@@ -123,11 +123,13 @@ class ModelHolder:
         **kwargs,
     ):
         if isinstance(model_info, dict):
+            model_info |= kwargs
             model_name = model_info["model_name"]
-            if "tokenizer" and "processor" not in kwargs:
+
+            if not any(k in kwargs for k in ("tokenizer", "processor")):
                 kwargs["tokenizer"] = AutoTokenizer.from_pretrained(model_name)
 
-            model_info = ModelInfo(**model_info, **kwargs)
+            model_info = ModelInfo(**model_info)
 
         cls.models[model_info.model_name] = model_info
 
